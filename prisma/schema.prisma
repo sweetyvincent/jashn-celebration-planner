@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  name      String?
+  avatarUrl String?
+  preferences String? // JSON stored as string for SQLite
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events         Event[]
+  collaborations Collaborator[]
+  activityLogs   ActivityLog[]
+}
+
+model Event {
+  id            String    @id @default(cuid())
+  userId        String
+  type          String
+  subType       String?
+  title         String
+  eventDate     DateTime?
+  city          String?
+  guestCount    Int       @default(0)
+  totalBudget   Float     @default(0)
+  currency      String    @default("INR")
+  vibeTags      String?   // JSON
+  preferences   String?   // JSON
+  culturalPrefs String?   // JSON
+  mustHaves     String?   // JSON
+  noGos         String?   // JSON
+  status        String    @default("draft")
+  aiPlanCache   String?   // JSON
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  budgetCategories BudgetCategory[]
+  timelineTasks    TimelineTask[]
+  vendors          Vendor[]
+  guests           Guest[]
+  ideas            Idea[]
+  collaborators    Collaborator[]
+  chatMessages     ChatMessage[]
+  activityLogs     ActivityLog[]
+  shareLinks       ShareLink[]
+  tables           Table[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model BudgetCategory {
+  id            String   @id @default(cuid())
+  eventId       String
+  name          String
+  plannedAmount Float    @default(0)
+  actualAmount  Float    @default(0)
+  paidAmount    Float    @default(0)
+  percentage    Float    @default(0)
+  notes         String?
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  event    Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  expenses Expense[]
+
+  @@index([eventId])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  categoryId  String
+  description String
+  amount      Float
+  date        DateTime @default(now())
+  receiptNote String?
+  isPaid      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category BudgetCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
+}
+
+model TimelineTask {
+  id          String    @id @default(cuid())
+  eventId     String
+  title       String
+  description String?
+  dueDate     DateTime?
+  status      String    @default("pending")
+  priority    String    @default("medium")
+  category    String?
+  assigneeId  String?
+  dependsOn   String?   // JSON array
+  sortOrder   Int       @default(0)
+  phase       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model Vendor {
+  id             String    @id @default(cuid())
+  eventId        String
+  category       String
+  name           String
+  status         String    @default("researching")
+  quoteAmount    Float?
+  contact        String?   // JSON
+  notes          String?
+  deadline       DateTime?
+  questionsToAsk String?   // JSON
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([category])
+}
+
+model Guest {
+  id         String   @id @default(cuid())
+  eventId    String
+  name       String
+  email      String?
+  phone      String?
+  group      String?
+  dietary    String?  // JSON array
+  plusOnes   Int      @default(0)
+  rsvpStatus String   @default("pending")
+  tableId    String?
+  rsvpToken  String?  @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  event Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  table Table? @relation(fields: [tableId], references: [id])
+
+  @@index([eventId])
+  @@index([rsvpStatus])
+}
+
+model Table {
+  id       String @id @default(cuid())
+  eventId  String
+  name     String
+  capacity Int    @default(8)
+  posX     Float  @default(0)
+  posY     Float  @default(0)
+
+  event  Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guests Guest[]
+
+  @@index([eventId])
+}
+
+model Idea {
+  id        String   @id @default(cuid())
+  eventId   String
+  kind      String
+  payload   String   // JSON
+  saved     Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([kind])
+}
+
+model Collaborator {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  role      String   @default("viewer")
+  invitedAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  eventId     String
+  role        String
+  content     String
+  toolCalls   String?  // JSON
+  toolResults String?  // JSON
+  createdAt   DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([createdAt])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String?
+  action    String
+  details   String?  // JSON
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id])
+
+  @@index([eventId])
+  @@index([createdAt])
+}
+
+model ShareLink {
+  id        String    @id @default(cuid())
+  eventId   String
+  token     String    @unique
+  type      String
+  role      String?
+  expiresAt DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([token])
+}
